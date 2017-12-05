@@ -1134,7 +1134,10 @@ def parse_pw_text_output(data, xml_data={}, structure_data={}, input_dict={}):
                 elif 'number of atomic types' in line:
                     ntyp = int(line.split('=')[1])
                 elif 'unit-cell volume' in line:
-                    volume = float(line.split('=')[1].split('(a.u.)^3')[0])
+                    try:
+                        volume = float(line.split('=')[1].split('(a.u.)^3')[0])
+                    except ValueError:
+                        volume = float(line.split('=')[1].split('a.u.^3')[0])
                 elif 'number of Kohn-Sham states' in line:
                     nbnd = int(line.split('=')[1])
                 elif "number of k points" in line:
