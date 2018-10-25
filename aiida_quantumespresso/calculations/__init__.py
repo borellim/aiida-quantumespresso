@@ -733,7 +733,7 @@ class BasePwCpInputGenerator(object):
         # Retrieve by default the output file and the xml file
         calcinfo.retrieve_list = []
         calcinfo.retrieve_list.append(self._OUTPUT_FILE_NAME)
-        calcinfo.retrieve_list.extend(self.xml_filenames)
+        calcinfo.retrieve_list.extend(self.xml_filepaths)
         calcinfo.retrieve_list += settings_dict.pop('ADDITIONAL_RETRIEVE_LIST', [])
         calcinfo.retrieve_list += self._internal_retrieve_list
 
