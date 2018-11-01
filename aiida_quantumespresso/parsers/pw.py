@@ -84,6 +84,10 @@ class PwParser(Parser):
             out_file = os.path.join(out_folder.get_abs_path('.'), self._calc._OUTPUT_FILE_NAME)
 
         # The xml file is required for successful parsing, but if it does not exist, we still try to parse the out file
+        print "xml_filnames:"
+        print self._calc.xml_filenames
+        print "list_of_files:"
+        print list_of_files
         xml_files = [xml_file for xml_file in self._calc.xml_filenames if xml_file in list_of_files]
         xml_file = None
 
@@ -191,6 +195,7 @@ class PwParser(Parser):
                                 new_dict['all_symmetries'] = this_sym
                             else:
                                 # Note: here I lose the information about equivalent ions and fractional_translation.
+                                # TODO: why??
                                 new_dict['t_rev'] = this_sym['t_rev']
                                 new_dict['symmetry_number'] = index
                         else:
