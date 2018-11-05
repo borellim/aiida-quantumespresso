@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import xmlschema
 from defusedxml import ElementTree
+import numpy as np
 
 from aiida_quantumespresso.parsers.constants import ry_to_ev, hartree_to_ev, bohr_to_ang, ry_si, bohr_si
 from .versions import get_schema_filepath, get_default_schema_filepath
@@ -37,17 +38,10 @@ def parse_pw_xml_post_6_2(xml_file):
         except URLError:
             raise ValueError('could not open and or parse the XSD file {}'.format(schema_filepath))
     
-#    # NOTE: since xmlschema 1.0.2, this should always return a tuple (to check)
-#    result = xsd.to_dict(xml, validation='lax')
-#
-#    if isinstance(result, tuple):
-#        xml_dictionary, errors = result
-#    else:
-#        xml_dictionary = result
-#        errors = []
-    
     xml_dictionary, errors = xsd.to_dict(xml, validation='lax')
-    # TODO: check "errors"
+    print "Errors from to_dict:"
+    print errors
+    # TODO: check what's in "errors"
 
     import json
     print json.dumps(xml_dictionary, indent=4)
@@ -75,6 +69,7 @@ def parse_pw_xml_post_6_2(xml_file):
 
         occupations = xml_dictionary['input']['bands']['occupations']
 
+# ????
         if occupations == 'from_input':
             fixed_occupations = True
         else:
@@ -90,6 +85,10 @@ def parse_pw_xml_post_6_2(xml_file):
             smearing_method = False
         else:
             smearing_method = True
+# SMEARING_METHOD = lgauss
+#       lgauss,         &! if .TRUE.: use gaussian broadening
+#       ltetra,         &! if .TRUE.: use tetrahedra
+# ????
 
     starting_magnetization = []
     magnetization_angle1 = []
@@ -172,6 +171,34 @@ def parse_pw_xml_post_6_2(xml_file):
             pass
 
         symmetries.append(sym)
+    
+    # Band structure
+    number_of_k_points = xml_dictionary['output']['band_structure']['nks']
+    number_of_electrons = xml_dictionary['output']['band_structure']['nelec']
+    number_of_atomic_wfc = xml_dictionary['output']['band_structure']['num_of_atomic_wfc']
+    number_of_bands = xml_dictionary['output']['band_structure']['nbnd']
+    k_points = []
+    #= [ks_state['k_point']['$'] for ks_state in xml_dictionary['output']['band_structure']['ks_energies']],
+    k_points_weights = []
+    #= [ks_state['k_point']['@weight'] for ks_state in xml_dictionary['output']['band_structure']['ks_energies']],
+    band_eigenvalues = []
+    band_occupations = []
+    for ks_state in xml_dictionary['output']['band_structure']['ks_energies']:
+        k_points.append(ks_state['k_point']['$'])
+        k_points_weights.append(ks_state['k_point']['@weight'])
+        band_eigenvalues.append(ks_state['eigenvalues']['$'])
+        band_occupations.append(ks_state['occupations']['$'])
+    band_eigenvalues = np.array(band_eigenvalues) * hartree_to_ev
+    if len(band_eigenvalues) != number_of_k_points or len(band_occupations) != number_of_k_points:
+        raise ValueError("Inconsistent number of k-points: nks={}, len(band_eigenvalues)={}, len(band_occupations)={}"
+                         .format(nks, len(band_eigenvalues), len(band_occupations)))
+    # TODO: can we use self.logger.error from here? Assert is not good! Unhandled exceptions aren't either!
+    
+    bands_dict = {
+        'occupations': band_occupations,
+        'bands': band_eigenvalues,
+        'bands_units': 'eV',
+    }
 
     print "AAAAAAAAAA"
     from pprint import pprint
@@ -186,13 +213,15 @@ def parse_pw_xml_post_6_2(xml_file):
         # 'beta_real_space': # Not printed in 6.3. Re-added after 6.3 (in branches develop and
             # qe-6.3-backports) as algorithmic_info / real_space_beta
             # (TODO: [2018-111-01] check that this has been done and add it back).
-        # 'lkpoint_dir': # Currently not printed in the new format.
+        'lkpoint_dir': False, # Currently not printed in the new format.
             # Signals whether kpt-data are written in sub-directories.
             # Was generally true in the old format, but now all the eigenvalues are
-            # in the XML file, under output / band_structure.
+            # in the XML file, under output / band_structure, so this is False.
         'charge_density': u'./charge-density.dat', # A file; not printed in the new format.
             # The filename and path are considered fixed: <outdir>/<prefix>.save/charge-density.dat
         # 'linknames_band': # TODO: get bands from this xml and put them in a output_band object
+        # (well, to be precise: this function should return a bands dictionary, then the "parse_raw_output"
+        # function in pw.py will put merge it with the Kpoints data into a BandsData node)
         'xml_warnings': [],
         'rho_cutoff_units': 'eV',
         'wfc_cutoff_units': 'eV',
@@ -219,9 +248,7 @@ def parse_pw_xml_post_6_2(xml_file):
         'do_magnetization': do_magnetization,
         'time_reversal_flag': time_reversal,
         'symmetries': symmetries,
-        'k_points': [eigenvalue['k_point']['$'] for eigenvalue in xml_dictionary['output']['band_structure']['ks_energies']],
         'do_not_use_time_reversal': xml_dictionary['input']['symmetry_flags']['noinv'],
-        'number_of_bands': xml_dictionary['output']['band_structure']['nbnd'],
         'spin_orbit_domag': xml_dictionary['output']['magnetization']['do_magnetization'],
         'fft_grid': xml_dictionary['output']['basis_set']['fft_grid'].values(),
         'lsda': lsda,
@@ -236,11 +263,13 @@ def parse_pw_xml_post_6_2(xml_file):
         'smooth_fft_grid': xml_dictionary['output']['basis_set']['fft_smooth'].values(),
         'dft_exchange_correlation': xml_dictionary['input']['dft']['functional'],
         'spin_orbit_calculation': spin_orbit_calculation,
-        'number_of_atomic_wfc': xml_dictionary['output']['band_structure']['num_of_atomic_wfc'],
-        'k_points_weights': [eigenvalue['k_point']['@weight'] for eigenvalue in xml_dictionary['output']['band_structure']['ks_energies']],
-        'number_of_k_points': xml_dictionary['output']['band_structure']['nks'],
+        'number_of_atomic_wfc': number_of_atomic_wfc,
+        'number_of_k_points': number_of_k_points,
+        'number_of_electrons': number_of_electrons,
+        'number_of_bands': number_of_bands,
+        'k_points': k_points,
+        'k_points_weights': k_points_weights,
         'q_real_space': xml_dictionary['output']['algorithmic_info']['real_space_q'],
-        'number_of_electrons': xml_dictionary['output']['band_structure']['nelec'],
     }
 
     if 'boundary_conditions' in xml_dictionary['output'] and 'assume_isolated' in xml_dictionary['output']['boundary_conditions']:
@@ -277,4 +306,4 @@ def parse_pw_xml_post_6_2(xml_file):
         },
     }
 
-    return xml_data, structure_data, {}
+    return xml_data, structure_data, bands_dict
