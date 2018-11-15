@@ -8,6 +8,7 @@
 # For further information on the license, see the LICENSE.txt file        #
 # For further information please visit http://www.aiida.net               #
 ###########################################################################
+from __future__ import print_function
 import sys
 import os
 
@@ -30,14 +31,14 @@ try:
     else:
         raise IndexError
 except IndexError:
-    print >> sys.stderr, ("The first parameter can only be either "
-                          "--send or --dont-send")
+    print(("The first parameter can only be either "
+                          "--send or --dont-send"), file=sys.stderr)
     sys.exit(1)
 
 try:
     parent_id = sys.argv[2]
 except IndexError:
-    print >> sys.stderr, ("Must provide as second parameter the parent ID")
+    print(("Must provide as second parameter the parent ID"), file=sys.stderr)
     sys.exit(1)
 
 
@@ -63,8 +64,8 @@ if isinstance(parentcalc,QEPwCalc):
     calc.description = "Test restart calculation with the Quantum ESPRESSO pw.x code"
 
 else:
-    print >> sys.stderr, ("Parent calculation should be a pw.x "
-                          "calculation.")
+    print(("Parent calculation should be a pw.x "
+                          "calculation."), file=sys.stderr)
     sys.exit(1)
 
 ######
@@ -95,17 +96,17 @@ calc.use_settings(ParameterData(dict=settings_dict))
 
 if submit_test:
     subfolder, script_filename = calc.submit_test()
-    print "Test_submit for calculation (uuid='{}')".format(
-        calc.uuid)
-    print "Submit file in {}".format(os.path.join(
+    print("Test_submit for calculation (uuid='{}')".format(
+        calc.uuid))
+    print("Submit file in {}".format(os.path.join(
         os.path.relpath(subfolder.abspath),
         script_filename
-        ))
+        )))
 else:
     calc.store_all()
-    print "created calculation; calc=Calculation(uuid='{}') # ID: {}".format(
-        calc.uuid,calc.dbnode.pk)
+    print("created calculation; calc=Calculation(uuid='{}') # ID: {}".format(
+        calc.uuid,calc.dbnode.pk))
     calc.submit()
-    print "submitted calculation; calc=Calculation(uuid='{}') # ID: {}".format(
-        calc.uuid,calc.dbnode.pk)
+    print("submitted calculation; calc=Calculation(uuid='{}') # ID: {}".format(
+        calc.uuid,calc.dbnode.pk))
 

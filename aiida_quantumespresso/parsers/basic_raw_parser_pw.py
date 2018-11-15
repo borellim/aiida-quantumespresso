@@ -6,6 +6,7 @@ The functions mostly work without aiida specific functionalities.
 The parsing will try to convert whatever it can in some dictionary, which
 by operative decision doesn't have much structure encoded, [the values are simple ]
 """
+from __future__ import print_function
 import xml.dom.minidom
 import os
 import string
@@ -175,7 +176,7 @@ def read_xml_card(dom, cardname):
         # the_card = dom.getElementsByTagName(cardname)[0]
         return the_card
     except Exception as e:
-        print e
+        print(e)
         raise QEOutputParsingError('Error parsing tag {}'.format(cardname))
 
 

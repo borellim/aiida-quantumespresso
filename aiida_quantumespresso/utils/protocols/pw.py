@@ -1,3 +1,4 @@
+from __future__ import print_function
 import json
 import os
 
@@ -221,5 +222,5 @@ class ProtocolManager(object):
 
 if __name__ == "__main__":
     p = ProtocolManager('theos-ht-1.0')
-    print p.check_pseudos()
-    print p.get_protocol_data()
+    print(p.check_pseudos())
+    print(p.get_protocol_data())

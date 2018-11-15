@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function
 import xml.dom.minidom
 import os
 import difflib
@@ -546,7 +547,7 @@ if __name__ == "__main__":
      structure.append_atom(symbols='O', position=[0.5,0.5,0.5])
 
      try:
-         print validate_pw_input({
+         print(validate_pw_input({
              'calculation': 'vc-relax',
              'ecutwfc': 30.,
              'lda_plus_u': True,
@@ -556,15 +557,15 @@ if __name__ == "__main__":
              'hubbard_u': {'O': 1},
              },
              structure, flat_mode = True,
-             version = '5.1')
+             version = '5.1'))
      except QEInputValidationError as e:
-         print "*"*72
-         print "* ERROR !"
-         print "*"*72
-         print e.message
+         print("*"*72)
+         print("* ERROR !")
+         print("*"*72)
+         print(e.message)
          
      try:
-         print validate_pw_input(
+         print(validate_pw_input(
              {
                  'CONTROL': {
                      'calculation': 'vc-relax'
@@ -582,11 +583,11 @@ if __name__ == "__main__":
                      'hubbard_u': {'O': 1.0}, 
                      'lda_plus_u': True}
              },
-             structure, flat_mode = False)
+             structure, flat_mode = False))
      except QEInputValidationError as e:
-         print "*"*72
-         print "* ERROR !"
-         print "*"*72
-         print e.message
+         print("*"*72)
+         print("* ERROR !")
+         print("*"*72)
+         print(e.message)
     
     
