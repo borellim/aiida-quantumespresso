@@ -38,18 +38,35 @@ def launch(
     """
     Run the PwRelaxWorkChain for a given input structure
     """
-    from aiida.orm.data.base import Bool, Str
+    from aiida.orm.data.base import Bool, Str, Float
     from aiida.orm.data.parameter import ParameterData
     from aiida.orm.utils import WorkflowFactory
     from aiida.work.launch import run, submit
     from aiida_quantumespresso.utils.resources import get_default_options, get_automatic_parallelization_options
 
     PwRelaxWorkChain = WorkflowFactory('quantumespresso.pw.relax')
+    
+    # ============================================= #
+    nnodes = 1
+    nthreads = 3  # ignored for normal QE (nthreads=1)
+    nranks_per_node = 4
+    kpools = nranks_per_node
+    # ============================================= #
 
     parameters = {
         'SYSTEM': {
             'ecutwfc': ecutwfc,
             'ecutrho': ecutrho,
+        },
+        'CONTROL': {
+            #'wf_collect': False,  # WARNING: needed for SIRIUS
+            'tprnfor': True,
+            'tstress': True,
+            'forc_conv_thr': 0.0001,
+        },
+        'ELECTRONS': {
+            #'startingwfc': 'file',  # WARNING: QE-GPU doesn't seem to like this option
+            'conv_thr': 1e-9 * len(structure.sites),  # TODO: change me back too 1e-10*len(sites) when running larger structures!!
         },
     }
 
@@ -74,16 +91,39 @@ def launch(
             'code': code,
             'pseudo_family': Str(pseudo_family),
             'kpoints': kpoints,
+            #'kpoints_distance': Float(0.4), # WARNING: overridden by kpoints
             'parameters': ParameterData(dict=parameters),
         }
     }
+    
+    if 'sirius' in code.label.lower():
+        settings = {
+            'cmdline': ['-nk', str(kpools), '-sirius', '-sirius_cfg', '/users/mborelli/sirius_cfg/sirius_config_anton_20180329.json']
+        }
+    else:
+        settings = {
+            'cmdline': ['-nk', str(kpools)]
+        }
+    settings = ParameterData(dict=settings)
+    inputs['base']['settings'] = settings
 
     if automatic_parallelization:
         automatic_parallelization = get_automatic_parallelization_options(max_num_machines, max_wallclock_seconds)
         inputs['base']['automatic_parallelization'] = ParameterData(dict=automatic_parallelization)
+    #elif 'sirius' in code.label.lower():
     else:
-        options = get_default_options(max_num_machines, max_wallclock_seconds)
-        inputs['base']['options'] = ParameterData(dict=options)
+        options = ParameterData(dict={
+            'resources': {
+                'num_machines': nnodes,
+                'num_mpiprocs_per_machine': nranks_per_node,
+                'num_cores_per_mpiproc': nthreads,
+            },
+            'max_wallclock_seconds': 60*30
+        })
+        inputs['base']['options'] = options
+    #else:
+    #    options = get_default_options(max_num_machines, max_wallclock_seconds)
+    #    inputs['base']['options'] = ParameterData(dict=options)
 
     if clean_workdir:
         inputs['clean_workdir'] = Bool(True)

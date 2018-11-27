@@ -289,6 +289,30 @@ class BaseRestartWorkChain(WorkChain):
         for the next calculation. If the calculation failed, but did so cleanly, we set it as the
         restart_calc, in all other cases we do not replace the restart_calc
         """
+        '''
+        # Sebastiaan/Marco: Draft of handling scheduler errors in a scheduler-independent way
+        scheduler = calculation.get_computer().get_scheduler()
+
+        try:
+            exit_code = scheduler.handle_errors(stdout, stderr)
+        except NotImplementedError:
+            pass
+       
+        if exit_code and exit_code.status != 0:
+            
+            if exit_code.status == SCHEDULER_ERROR_CODE.OUT_OF_MEMORY:
+                try:
+                    self._handle_out_of_memory()
+                except NotImplementedError:
+                    pass
+            elif exit_code.status == SCHEDULER_ERROR_CODE.OUT_OF_WALLTIME:
+                try:
+                    self._handle_out_of_walltime()
+                except NotImplementedError:
+                    pass
+            return exit_code\
+        '''
+
         try:
             outputs = calculation.out.output_parameters.get_dict()
             _ = outputs['warnings']
@@ -322,6 +346,7 @@ class BaseRestartWorkChain(WorkChain):
 
         # The last called error handler may not necessarily have returned a handler report
         if handler_report:
+            self.report('returning handler_report {} {}'.format(type(handler_report), handler_report))
             return handler_report.exit_code
 
         return

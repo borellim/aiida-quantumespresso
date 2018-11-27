@@ -31,6 +31,7 @@ PwCalculation = CalculationFactory('quantumespresso.pw')
 class PwBaseWorkChain(BaseRestartWorkChain):
     """Workchain to run a Quantum ESPRESSO pw.x calculation with automated error handling and restarts"""
 
+    _verbose = True
     _calculation_class = PwCalculation
     _error_handler_entry_point = 'aiida_quantumespresso.workflow_error_handlers.pw.base'
 
@@ -40,6 +41,7 @@ class PwBaseWorkChain(BaseRestartWorkChain):
         'delta_factor_degauss': 0.1,
         'delta_factor_mixing_beta': 0.8,
         'delta_factor_max_seconds': 0.95,
+        #TODO: add delta_factor_max_memory_kb ?
     })
 
     @classmethod
@@ -89,6 +91,8 @@ class PwBaseWorkChain(BaseRestartWorkChain):
             message='the initialization calculation failed')
         spec.exit_code(402, 'ERROR_CALCULATION_INVALID_INPUT_FILE',
             message='the calculation failed because it had an invalid input file')
+        spec.exit_code(420, 'ERROR_CALCULATION_OUT_OF_MEMORY',
+            message='the calculation requested too much system RAM or GPU RAM')
         spec.output('output_array', valid_type=ArrayData, required=False)
         spec.output('output_band', valid_type=BandsData, required=False)
         spec.output('output_structure', valid_type=StructureData, required=False)
