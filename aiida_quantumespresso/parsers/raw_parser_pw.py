@@ -19,7 +19,7 @@ from aiida_quantumespresso.parsers.parse_xml.pw.versions import get_xml_file_ver
 lattice_tolerance = 1.e-5
 default_energy_units = 'eV'
 units_suffix = '_units'
-k_points_default_units = '2 pi / Angstrom'
+k_points_default_units = '1 / angstrom'
 default_length_units = 'Angstrom'
 default_dipole_units = 'Debye'
 default_magnetization_units = 'Bohrmag / cell'
@@ -66,9 +66,9 @@ def parse_raw_output(out_file, input_dict, parser_opts={}, xml_file=None, dir_wi
             raise QEOutputParsingError('failed to determine XML output file version: {}'.format(exception))
 
         if xml_file_version == QeXmlVersion.POST_6_2:
-            xml_data, structure_data, bands_data = parse_pw_xml_post_6_2(xml_file)
+            xml_data, structure_data, bands_data = parse_pw_xml_post_6_2(xml_file, parser_opts)
         elif xml_file_version == QeXmlVersion.PRE_6_2:
-            xml_data, structure_data, bands_data = parse_pw_xml_pre_6_2(xml_file, dir_with_bands)
+            xml_data, structure_data, bands_data = parse_pw_xml_pre_6_2(xml_file, dir_with_bands, parser_opts)
         else:
             raise ValueError('unrecognize XML file version')
 
@@ -110,8 +110,8 @@ def parse_raw_output(out_file, input_dict, parser_opts={}, xml_file=None, dir_wi
         else: # if it was finished and I got error, it's a mistake of the parser
             raise QEOutputParsingError('Error while parsing QE output. Exception message: {}'.format(e.message))
 
-    # I add in the out_data all the last elements of trajectory_data values.
-    # Safe for some large arrays, that I will likely never query.
+    # I add in the out_data all the last elements of trajectory_data values,
+    # except for some large arrays, that I will likely never query.
     skip_keys = ['forces','atomic_magnetic_moments','atomic_charges',
                  'lattice_vectors_relax','atomic_positions_relax',
                  'atomic_species_name']
@@ -718,7 +718,7 @@ def xml_card_exchangecorrelation(parsed_data,dom):
 
     return parsed_data
 
-def parse_pw_xml_pre_6_2(xml_file, dir_with_bands=None):
+def parse_pw_xml_pre_6_2(xml_file, dir_with_bands, parser_opts):
     """
     Parse the XML output file of Quantum ESPRESSO with the format from before the XSD schema file
     Returns a dictionary with parsed values
@@ -727,6 +727,8 @@ def parse_pw_xml_pre_6_2(xml_file, dir_with_bands=None):
     from xml.parsers.expat import ExpatError
     # NOTE : I often assume that if the xml file has been written, it has no
     # internal errors.
+
+    include_deprecated_v2_keys = parser_opts.get('include_deprecated_v2_keys')
 
     try:
         with open(xml_file, 'r') as handle:
@@ -830,11 +832,17 @@ def parse_pw_xml_pre_6_2(xml_file, dir_with_bands=None):
             a=a_dict[tagname]
             b = a.getAttribute('XYZ').replace('\n','').rsplit()
             value = [ float(s) for s in b ]
-
             metric = k_points_units
+            if i==1:
+                print "K-POINT 1:", b
+                print "metric:", metric
             if metric=='2 pi / a':
                 value = [ 2.*numpy.pi*float(s)/structure_dict['lattice_parameter'] for s in value ]
                 weight = float(a.getAttribute('WEIGHT'))
+                if i==1:
+                    print "value:", value
+                    print "weight:", weight
+                    print "lattice parameter:", structure_dict['lattice_parameter']
                 kpoints.append(value)
                 kpoints_weights.append(weight)
         parsed_data['k_points']=kpoints
@@ -956,6 +964,15 @@ def parse_pw_xml_pre_6_2(xml_file, dir_with_bands=None):
     target_tags = read_xml_card(dom,cardname)
     for tagname in ['SMEARING_METHOD','TETRAHEDRON_METHOD','FIXED_OCCUPATIONS']:
         parsed_data[tagname.lower()] = parse_xml_child_bool(tagname,target_tags)
+    if parsed_data['smearing_method']:
+        parsed_data['occupations'] = 'smearing'
+    elif parsed_data['tetrahedron_method']:
+        parsed_data['occupations'] = 'tetrahedra'  # TODO: might also be tetrahedra_lin or tetrahedra_opt
+    elif parsed_data['fixed_occupations']:
+        parsed_data['occupations'] = 'fixed'
+    if not include_deprecated_v2_keys:
+        for tagname in ['SMEARING_METHOD','TETRAHEDRON_METHOD','FIXED_OCCUPATIONS']:
+            parsed_data.pop(tagname.lower())
 
     #CARD CHARGE-DENSITY
     cardname='CHARGE-DENSITY'

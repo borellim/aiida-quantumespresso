@@ -34,9 +34,15 @@ def cell_volume(a1, a2, a3):
     return abs(float(a1[0] * a_mid_0 + a1[1] * a_mid_1 + a1[2] * a_mid_2))
 
 
-def parse_pw_xml_post_6_2(xml_file):
+#def copy_if_exists(dest_dict, src_dict, dest_key, src_key):
+#    if src_key in src_dict:
+#        dest_dict[dest_key] = src_dict[src_key]
+
+def parse_pw_xml_post_6_2(xml_file, parser_opts):
     """
     """
+    include_deprecated_v2_keys = parser_opts.get('include_deprecated_v2_keys')
+    
     try:
         xml = ElementTree.parse(xml_file)
     except IOError:
@@ -60,6 +66,13 @@ def parse_pw_xml_post_6_2(xml_file):
     print "Errors from to_dict:"
     print errors
     # TODO: check what's in "errors"
+    
+    # NOTE: the syntax for accessing the decoded XML dictionary is the following.
+    #       - If tag ['key'] is "simple", xml_dictionary['key'] returns its content;
+    #       - otherwise:
+    #         - xml_dictionary['key']['$'] returns its content
+    #         - xml_dictionary['key']['@attr'] returns its attribute 'attr'
+    #         - xml_dictionary['key']['nested_key'] goes one level deeper.
 
     import json
     print json.dumps(xml_dictionary, indent=4)
@@ -83,12 +96,22 @@ def parse_pw_xml_post_6_2(xml_file):
     else:
         has_dipole_correction = False
 
-    if 'bands' in xml_dictionary['input'] and 'occupations' in xml_dictionary['input']['bands']:
+    #if 'bands' in xml_dictionary['input'] and 'occupations' in xml_dictionary['input']['bands']:
+    # the above condition is always true, according to the new schema
 
+    try:
+        occupations = xml_dictionary['input']['bands']['occupations']['$']  # also present as ['output']['band_structure']['occupations_kind']
+    except TypeError:  # "string indices must be integers" -- might have attribute 'nspin'
         occupations = xml_dictionary['input']['bands']['occupations']
 
-# ????
-        if occupations == 'from_input':
+    # TODO: ask Giovanni. Sebastiaan says to remove all this, and use 'occupations' as a string,
+    #       with possible types "smearing","tetrahedra", ...
+    #       (see: https://www.quantum-espresso.org/Doc/INPUT_PW.html#idm45922794525424)
+    
+    # TODO: suggest Pietro to use a 'choice' for occupations, rather than a string
+    if include_deprecated_v2_keys:
+        
+        if occupations == 'from_input':  # False for 'fixed'
             fixed_occupations = True
         else:
             fixed_occupations = False
@@ -98,15 +121,35 @@ def parse_pw_xml_post_6_2(xml_file):
         else:
             tetrahedron_method = False
 
-        # WARNING Question for Sebastiaan: I flipped these two. Does it make sense?
         if occupations == 'from_input':
             smearing_method = False
         else:
             smearing_method = True
+            if 'smearing' not in xml_dictionary['output']['band_structure'] and 'smearing' not in xml_dictionary['input']['bands']:
+                print "WARNING: unexpected smearing tags"
+                # TODO: log an error properly
+        
+    if 'smearing' in xml_dictionary['output']['band_structure']:
+        smearing_xml = xml_dictionary['output']['band_structure']['smearing']
+    elif 'smearing' in xml_dictionary['input']['bands']:
+        smearing_xml = xml_dictionary['input']['bands']['smearing']
+    try:
+        smearing_type    = smearing_xml['$']
+        smearing_degauss = smearing_xml['@degauss']  # TODO: degauss or parameter? TODO: it's broken in the old parser too (it's negative!?)
+    except NameError:
+        pass
+            
 # SMEARING_METHOD = lgauss
 #       lgauss,         &! if .TRUE.: use gaussian broadening
 #       ltetra,         &! if .TRUE.: use tetrahedra
-# ????
+# SMEARING_TYPE = ngauss  (see Modules/qexml.f90:1530)
+#       ngauss              ! type of smearing technique
+# From dos.x input description:
+#   Type of gaussian broadening:
+#      =  0  Simple Gaussian (default)
+#      =  1  Methfessel-Paxton of order 1
+#      = -1  Marzari-Vanderbilt "cold smearing"
+#      =-99  Fermi-Dirac function
 
     starting_magnetization = []
     magnetization_angle1 = []
@@ -219,8 +262,9 @@ def parse_pw_xml_post_6_2(xml_file):
     k_points = []
     k_points_weights = []
     ks_states = xml_dictionary['output']['band_structure']['ks_energies']
+    output_alat_angstrom = xml_dictionary['output']['atomic_structure']['@alat'] * bohr_to_ang
     for ks_state in ks_states:
-        k_points.append(ks_state['k_point']['$'])
+        k_points.append([kp*2*np.pi/output_alat_angstrom for kp in ks_state['k_point']['$']])
         k_points_weights.append(ks_state['k_point']['@weight'])
     # bands
     if not spins:
@@ -282,8 +326,9 @@ def parse_pw_xml_post_6_2(xml_file):
             # Signals whether kpt-data are written in sub-directories.
             # Was generally true in the old format, but now all the eigenvalues are
             # in the XML file, under output / band_structure, so this is False.
-        'charge_density': u'./charge-density.dat', # A file; not printed in the new format.
+        'charge_density': u'./charge-density.dat', # A file name. Not printed in the new format.
             # The filename and path are considered fixed: <outdir>/<prefix>.save/charge-density.dat
+            # TODO: change to .hdf5 if output format is HDF5 (issue #222)
         # 'linknames_band': # TODO: get bands from this xml and put them in a output_band object
         # (well, to be precise: this function should return a bands dictionary, then the "parse_raw_output"
         # function in pw.py will put merge it with the Kpoints data into a BandsData node)
@@ -291,12 +336,10 @@ def parse_pw_xml_post_6_2(xml_file):
         'rho_cutoff_units': 'eV',
         'wfc_cutoff_units': 'eV',
         'fermi_energy_units': 'eV',
-        'k_points_units': '2 pi / Angstrom',
+        'k_points_units': '1 / angstrom',
         'symmetries_units': 'crystal',
         'constraint_mag': constraint_mag,
-        'fixed_occupations': fixed_occupations,
-        'tetrahedron_method': tetrahedron_method,
-        'smearing_method': smearing_method,
+        'occupations': occupations,
         'magnetization_angle2': magnetization_angle2,
         'magnetization_angle1': magnetization_angle1,
         'starting_magnetization': starting_magnetization,
@@ -305,6 +348,8 @@ def parse_pw_xml_post_6_2(xml_file):
         'lda_plus_u_calculation': 'dftU' in xml_dictionary['output'],
         'format_name': xml_dictionary['general_info']['xml_format']['@NAME'],
         'format_version': xml_dictionary['general_info']['xml_format']['@VERSION'],
+        # TODO: check that format version: a) matches the XSD schema version; b) is updated as well
+        #       See line 43 in Modules/qexsd.f90
         'creator_name': xml_dictionary['general_info']['creator']['@NAME'].lower(),
         'creator_version': xml_dictionary['general_info']['creator']['@VERSION'],
         'monkhorst_pack_grid': [xml_dictionary['input']['k_points_IBZ']['monkhorst_pack'][attr] for attr in ['@nk1','@nk2','@nk3']],
@@ -327,7 +372,8 @@ def parse_pw_xml_post_6_2(xml_file):
         'wfc_cutoff': xml_dictionary['input']['basis']['ecutwfc'] * hartree_to_ev,
         'rho_cutoff': xml_dictionary['output']['basis_set']['ecutrho'] * hartree_to_ev, # not always printed in input->basis
         'smooth_fft_grid': xml_dictionary['output']['basis_set']['fft_smooth'].values(),
-        'dft_exchange_correlation': xml_dictionary['input']['dft']['functional'],
+        'dft_exchange_correlation': xml_dictionary['input']['dft']['functional'],  # TODO: also parse optional elements of 'dft' tag
+            # WARNING: this ^^^ is probably wrong: ask Pietro.
         'spin_orbit_calculation': spin_orbit_calculation,
         'number_of_atomic_wfc': num_atomic_wfc,
         'number_of_k_points': num_k_points,
@@ -340,10 +386,25 @@ def parse_pw_xml_post_6_2(xml_file):
 
     if 'boundary_conditions' in xml_dictionary['output'] and 'assume_isolated' in xml_dictionary['output']['boundary_conditions']:
         xml_data['assume_isolated'] = xml_dictionary['output']['boundary_conditions']['assume_isolated']
-
+    
     if 'fermi_energy' in xml_dictionary['output']['band_structure']:
         xml_data['fermi_energy'] = xml_dictionary['output']['band_structure']['fermi_energy'] * hartree_to_ev
-
+    
+    # This is not printed by QE 6.3, but will be re-added shortly after
+    if 'real_space_beta' in xml_dictionary['output']['algorithmic_info']:
+        xml_data['beta_real_space'] = xml_dictionary['output']['algorithmic_info']['real_space_beta']
+    
+    if include_deprecated_v2_keys:
+        xml_data['fixed_occupations'] = fixed_occupations
+        xml_data['tetrahedron_method'] = tetrahedron_method
+        xml_data['smearing_method'] = smearing_method
+    
+    # TODO: parse output -> convergence_info (mandatory in schema 1.0, optional after that)
+    # TODO: parse new timing type
+    # TODO: parse Hubbard stuff (NB: label is optional)
+    # TODO: parse output status
+    # TODO: add parser option include_deprecated_v2_keys
+    
     # We should put the `non_periodic_cell_correction` string in
     atoms = [[atom['@name'], [coord*bohr_to_ang for coord in atom['$']]] for atom in xml_dictionary['output']['atomic_structure']['atomic_positions']['atom']]
     species = xml_dictionary['output']['atomic_species']['species']
@@ -352,7 +413,7 @@ def parse_pw_xml_post_6_2(xml_file):
        'direct_lattice_vectors_units': 'Angstrom',
         # ??? 'atoms_if_pos_list': [[1, 1, 1], [1, 1, 1]],
         'number_of_atoms': xml_dictionary['output']['atomic_structure']['@nat'],
-        'lattice_parameter': xml_dictionary['input']['atomic_structure']['@alat'],
+        'lattice_parameter': output_alat_angstrom,
         'reciprocal_lattice_vectors': [
             xml_dictionary['output']['basis_set']['reciprocal_lattice']['b1'],
             xml_dictionary['output']['basis_set']['reciprocal_lattice']['b2'],
@@ -364,8 +425,8 @@ def parse_pw_xml_post_6_2(xml_file):
             'volume': cell_volume(*lattice_vectors),
             'atoms': atoms,
         },
-        'lattice_parameter_xml': xml_dictionary['input']['atomic_structure']['@alat'],
-        'number_of_species': xml_dictionary['input']['atomic_species']['@ntyp'],
+        'lattice_parameter_xml': xml_dictionary['output']['atomic_structure']['@alat'],  # TODO: replace with input if not present?
+        'number_of_species': xml_dictionary['output']['atomic_species']['@ntyp'],  # TODO: replace with input if not present?
         'species': {
             'index': [i + 1 for i,specie in enumerate(species)],
             'pseudo': [specie['pseudo_file'] for specie in species],
