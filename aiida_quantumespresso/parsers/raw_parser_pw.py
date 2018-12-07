@@ -728,7 +728,7 @@ def parse_pw_xml_pre_6_2(xml_file, dir_with_bands, parser_opts):
     # NOTE : I often assume that if the xml file has been written, it has no
     # internal errors.
 
-    include_deprecated_v2_keys = parser_opts.get('include_deprecated_v2_keys')
+    include_deprecated_v2_keys = parser_opts.get('include_deprecated_v2_keys', False)
 
     try:
         with open(xml_file, 'r') as handle:

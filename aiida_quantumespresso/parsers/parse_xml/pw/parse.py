@@ -41,7 +41,7 @@ def cell_volume(a1, a2, a3):
 def parse_pw_xml_post_6_2(xml_file, parser_opts):
     """
     """
-    include_deprecated_v2_keys = parser_opts.get('include_deprecated_v2_keys')
+    include_deprecated_v2_keys = parser_opts.get('include_deprecated_v2_keys', False)
     
     try:
         xml = ElementTree.parse(xml_file)
@@ -403,7 +403,6 @@ def parse_pw_xml_post_6_2(xml_file, parser_opts):
     # TODO: parse new timing type
     # TODO: parse Hubbard stuff (NB: label is optional)
     # TODO: parse output status
-    # TODO: add parser option include_deprecated_v2_keys
     
     # We should put the `non_periodic_cell_correction` string in
     atoms = [[atom['@name'], [coord*bohr_to_ang for coord in atom['$']]] for atom in xml_dictionary['output']['atomic_structure']['atomic_positions']['atom']]
