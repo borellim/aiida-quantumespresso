@@ -38,7 +38,7 @@ def cell_volume(a1, a2, a3):
 #    if src_key in src_dict:
 #        dest_dict[dest_key] = src_dict[src_key]
 
-def parse_pw_xml_post_6_2(xml_file, parser_opts):
+def parse_pw_xml_post_6_2(xml_file, parser_opts, logger):
     """
     """
     include_deprecated_v2_keys = parser_opts.get('include_deprecated_v2_keys', False)
@@ -103,10 +103,6 @@ def parse_pw_xml_post_6_2(xml_file, parser_opts):
         occupations = xml_dictionary['input']['bands']['occupations']['$']  # also present as ['output']['band_structure']['occupations_kind']
     except TypeError:  # "string indices must be integers" -- might have attribute 'nspin'
         occupations = xml_dictionary['input']['bands']['occupations']
-
-    # TODO: ask Giovanni. Sebastiaan says to remove all this, and use 'occupations' as a string,
-    #       with possible types "smearing","tetrahedra", ...
-    #       (see: https://www.quantum-espresso.org/Doc/INPUT_PW.html#idm45922794525424)
     
     # TODO: suggest Pietro to use a 'choice' for occupations, rather than a string
     if include_deprecated_v2_keys:
@@ -125,31 +121,40 @@ def parse_pw_xml_post_6_2(xml_file, parser_opts):
             smearing_method = False
         else:
             smearing_method = True
-            if 'smearing' not in xml_dictionary['output']['band_structure'] and 'smearing' not in xml_dictionary['input']['bands']:
-                print "WARNING: unexpected smearing tags"
-                # TODO: log an error properly
         
+        if smearing_method:
+            if 'smearing' not in (xml_dictionary['output']['band_structure'].keys() + xml_dictionary['input']['bands'].keys()):
+                logger.error("occupations is {} but key 'smearing' is not present under input/bands"
+                             "nor output/band_structure".format(occupations))
+
+    # Not including smearing type and width for now.
+    # In the old XML format they are under OCCUPATIONS as SMEARING_TYPE and SMEARING_PARAMETER,
+    # but watch out: the value in the old format is half of that in the new format
+    # (the code divides it by e2=2.0, see PW/src/pw_restart.f90:446) 
+    '''
     if 'smearing' in xml_dictionary['output']['band_structure']:
         smearing_xml = xml_dictionary['output']['band_structure']['smearing']
     elif 'smearing' in xml_dictionary['input']['bands']:
         smearing_xml = xml_dictionary['input']['bands']['smearing']
     try:
         smearing_type    = smearing_xml['$']
-        smearing_degauss = smearing_xml['@degauss']  # TODO: degauss or parameter? TODO: it's broken in the old parser too (it's negative!?)
+        smearing_degauss = smearing_xml['@degauss']
     except NameError:
         pass
-            
-# SMEARING_METHOD = lgauss
-#       lgauss,         &! if .TRUE.: use gaussian broadening
-#       ltetra,         &! if .TRUE.: use tetrahedra
-# SMEARING_TYPE = ngauss  (see Modules/qexml.f90:1530)
-#       ngauss              ! type of smearing technique
-# From dos.x input description:
-#   Type of gaussian broadening:
-#      =  0  Simple Gaussian (default)
-#      =  1  Methfessel-Paxton of order 1
-#      = -1  Marzari-Vanderbilt "cold smearing"
-#      =-99  Fermi-Dirac function
+    '''
+    
+    # Here are some notes from the code for reference.
+    # SMEARING_METHOD = lgauss
+    #       lgauss,         &! if .TRUE.: use gaussian broadening
+    #       ltetra,         &! if .TRUE.: use tetrahedra
+    # SMEARING_TYPE = ngauss  (see Modules/qexml.f90:1530)
+    #       ngauss              ! type of smearing technique
+    # From dos.x input description:
+    #   Type of gaussian broadening:
+    #      =  0  Simple Gaussian (default)
+    #      =  1  Methfessel-Paxton of order 1
+    #      = -1  Marzari-Vanderbilt "cold smearing"
+    #      =-99  Fermi-Dirac function
 
     starting_magnetization = []
     magnetization_angle1 = []
@@ -193,9 +198,6 @@ def parse_pw_xml_post_6_2(xml_file, parser_opts):
     else:
         nspin = 1
 
-    # Detect presence of inversion symmetry, which is the case if a `crystal` symmetry has the attribute `inversion`
-    # Note that `lattice` symmetries will always have inversion symmetry and should therefore be ignored
-    # TODO: what?
     symmetries = []
     lattice_symmetries = []
     inversion_symmetry = False
@@ -285,13 +287,7 @@ def parse_pw_xml_post_6_2(xml_file, parser_opts):
 
     band_eigenvalues = np.array(band_eigenvalues) * hartree_to_ev
     band_occupations = np.array(band_occupations)
-    # TODO: remove this v
-    print type(num_k_points), type(num_bands), type(num_bands_up), type(num_bands_down)
-    print type(band_eigenvalues), type(band_occupations)
-    print type(band_eigenvalues.shape), type(band_occupations.shape)
-    #print type(band_occupations.shape[0]), type(band_occupations.shape[1]), type(band_occupations.shape[2])
-    print band_eigenvalues.shape, band_occupations.shape
-    # TODO remove this ^
+
     if not spins:
         parser_assert_equal(band_eigenvalues.shape, (1,num_k_points,num_bands),
                             "Unexpected shape of band_eigenvalues")
@@ -308,11 +304,6 @@ def parse_pw_xml_post_6_2(xml_file, parser_opts):
         'bands': band_eigenvalues,
         'bands_units': 'eV',
     }
-
-    print "AAAAAAAAAA"
-    from pprint import pprint
-    pprint(xml_dictionary['output']['basis_set'])
-    print "AAAAAAAAAA"
 
     xml_data = {
         #'pp_check_flag': True, # Currently not printed in the new format.

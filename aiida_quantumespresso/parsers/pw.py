@@ -102,7 +102,7 @@ class PwParser(Parser):
 
         # Call the raw parsing function
         out_dict, trajectory_data, structure_data, bands_data, raw_successful = parse_raw_output(
-            out_file, parameters, parser_opts, xml_file, dir_with_bands
+            out_file, parameters, parser_opts, self.logger, xml_file, dir_with_bands
         )
 
         # If calculation was not considered failed already, use the new value

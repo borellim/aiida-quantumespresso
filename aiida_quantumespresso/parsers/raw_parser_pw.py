@@ -29,7 +29,7 @@ default_stress_units = 'GPascal'
 default_polarization_units = 'C / m^2'
 
 
-def parse_raw_output(out_file, input_dict, parser_opts={}, xml_file=None, dir_with_bands=None):
+def parse_raw_output(out_file, input_dict, parser_opts, logger, xml_file=None, dir_with_bands=None):
     """
     Parses the output of a calculation
     Receives in input the paths to the output file and the xml file.
@@ -43,6 +43,7 @@ def parse_raw_output(out_file, input_dict, parser_opts={}, xml_file=None, dir_wi
     :return parsed_data: dictionary with key values, referring to quantities at the last scf step
     :param dir_with_bands: path to directory with all k-points (Kxxxxx) folders
     :param xml_file: optional path to the XML output file
+    # TODO: update this documentation
 
     :return parameter_data: a dictionary with parsed parameters
     :return trajectory_data: a dictionary with arrays (for relax & md calcs.)
@@ -66,9 +67,9 @@ def parse_raw_output(out_file, input_dict, parser_opts={}, xml_file=None, dir_wi
             raise QEOutputParsingError('failed to determine XML output file version: {}'.format(exception))
 
         if xml_file_version == QeXmlVersion.POST_6_2:
-            xml_data, structure_data, bands_data = parse_pw_xml_post_6_2(xml_file, parser_opts)
+            xml_data, structure_data, bands_data = parse_pw_xml_post_6_2(xml_file, parser_opts, logger)
         elif xml_file_version == QeXmlVersion.PRE_6_2:
-            xml_data, structure_data, bands_data = parse_pw_xml_pre_6_2(xml_file, dir_with_bands, parser_opts)
+            xml_data, structure_data, bands_data = parse_pw_xml_pre_6_2(xml_file, dir_with_bands, parser_opts, logger)
         else:
             raise ValueError('unrecognize XML file version')
 
@@ -718,7 +719,7 @@ def xml_card_exchangecorrelation(parsed_data,dom):
 
     return parsed_data
 
-def parse_pw_xml_pre_6_2(xml_file, dir_with_bands, parser_opts):
+def parse_pw_xml_pre_6_2(xml_file, dir_with_bands, parser_opts, logger):
     """
     Parse the XML output file of Quantum ESPRESSO with the format from before the XSD schema file
     Returns a dictionary with parsed values
