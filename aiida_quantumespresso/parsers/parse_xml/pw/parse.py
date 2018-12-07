@@ -63,9 +63,6 @@ def parse_pw_xml_post_6_2(xml_file, parser_opts, logger):
             raise ValueError('could not open and or parse the XSD file {}'.format(schema_filepath))
     
     xml_dictionary, errors = xsd.to_dict(xml, validation='lax')
-    print "Errors from to_dict:"
-    print errors
-    # TODO: check what's in "errors"
     
     # NOTE: the syntax for accessing the decoded XML dictionary is the following.
     #       - If tag ['key'] is "simple", xml_dictionary['key'] returns its content;
@@ -310,9 +307,6 @@ def parse_pw_xml_post_6_2(xml_file, parser_opts, logger):
             #Signals whether the XML file is complete
             # and can be used for post-processing. Everything should be in the XML now, but in
             # any case, the new XML schema should mostly protect from incomplete files.
-        # 'beta_real_space': # Not printed in 6.3. Re-added after 6.3 (in branches develop and
-            # qe-6.3-backports) as algorithmic_info / real_space_beta
-            # (TODO: [2018-111-01] check that this has been done and add it back).
         'lkpoint_dir': False, # Currently not printed in the new format.
             # Signals whether kpt-data are written in sub-directories.
             # Was generally true in the old format, but now all the eigenvalues are
@@ -381,7 +375,7 @@ def parse_pw_xml_post_6_2(xml_file, parser_opts, logger):
     if 'fermi_energy' in xml_dictionary['output']['band_structure']:
         xml_data['fermi_energy'] = xml_dictionary['output']['band_structure']['fermi_energy'] * hartree_to_ev
     
-    # This is not printed by QE 6.3, but will be re-added shortly after
+    # This is not printed by QE 6.3, but will be re-added before the next version
     if 'real_space_beta' in xml_dictionary['output']['algorithmic_info']:
         xml_data['beta_real_space'] = xml_dictionary['output']['algorithmic_info']['real_space_beta']
     
@@ -389,11 +383,6 @@ def parse_pw_xml_post_6_2(xml_file, parser_opts, logger):
         xml_data['fixed_occupations'] = fixed_occupations
         xml_data['tetrahedron_method'] = tetrahedron_method
         xml_data['smearing_method'] = smearing_method
-    
-    # TODO: parse output -> convergence_info (mandatory in schema 1.0, optional after that)
-    # TODO: parse new timing type
-    # TODO: parse Hubbard stuff (NB: label is optional)
-    # TODO: parse output status
     
     # We should put the `non_periodic_cell_correction` string in
     atoms = [[atom['@name'], [coord*bohr_to_ang for coord in atom['$']]] for atom in xml_dictionary['output']['atomic_structure']['atomic_positions']['atom']]
@@ -415,8 +404,8 @@ def parse_pw_xml_post_6_2(xml_file, parser_opts, logger):
             'volume': cell_volume(*lattice_vectors),
             'atoms': atoms,
         },
-        'lattice_parameter_xml': xml_dictionary['output']['atomic_structure']['@alat'],  # TODO: replace with input if not present?
-        'number_of_species': xml_dictionary['output']['atomic_species']['@ntyp'],  # TODO: replace with input if not present?
+        'lattice_parameter_xml': xml_dictionary['output']['atomic_structure']['@alat'],
+        'number_of_species': xml_dictionary['output']['atomic_species']['@ntyp'],
         'species': {
             'index': [i + 1 for i,specie in enumerate(species)],
             'pseudo': [specie['pseudo_file'] for specie in species],

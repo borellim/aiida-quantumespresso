@@ -40,10 +40,10 @@ def parse_raw_output(out_file, input_dict, parser_opts, logger, xml_file=None, d
 
     :param out_file: path to pw std output
     :param input_dict: dictionary with the input parameters
-    :return parsed_data: dictionary with key values, referring to quantities at the last scf step
-    :param dir_with_bands: path to directory with all k-points (Kxxxxx) folders
+    :param parser_opts: dictionary with parser options
+    :param logger: aiida logger object
     :param xml_file: optional path to the XML output file
-    # TODO: update this documentation
+    :param dir_with_bands: path to directory with all k-points (Kxxxxx) folders
 
     :return parameter_data: a dictionary with parsed parameters
     :return trajectory_data: a dictionary with arrays (for relax & md calcs.)
@@ -834,16 +834,9 @@ def parse_pw_xml_pre_6_2(xml_file, dir_with_bands, parser_opts, logger):
             b = a.getAttribute('XYZ').replace('\n','').rsplit()
             value = [ float(s) for s in b ]
             metric = k_points_units
-            if i==1:
-                print "K-POINT 1:", b
-                print "metric:", metric
             if metric=='2 pi / a':
                 value = [ 2.*numpy.pi*float(s)/structure_dict['lattice_parameter'] for s in value ]
                 weight = float(a.getAttribute('WEIGHT'))
-                if i==1:
-                    print "value:", value
-                    print "weight:", weight
-                    print "lattice parameter:", structure_dict['lattice_parameter']
                 kpoints.append(value)
                 kpoints_weights.append(weight)
         parsed_data['k_points']=kpoints
@@ -968,7 +961,7 @@ def parse_pw_xml_pre_6_2(xml_file, dir_with_bands, parser_opts, logger):
     if parsed_data['smearing_method']:
         parsed_data['occupations'] = 'smearing'
     elif parsed_data['tetrahedron_method']:
-        parsed_data['occupations'] = 'tetrahedra'  # TODO: might also be tetrahedra_lin or tetrahedra_opt
+        parsed_data['occupations'] = 'tetrahedra'  # TODO: might also be tetrahedra_lin or tetrahedra_opt: check input?
     elif parsed_data['fixed_occupations']:
         parsed_data['occupations'] = 'fixed'
     if not include_deprecated_v2_keys:
