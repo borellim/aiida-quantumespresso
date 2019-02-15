@@ -8,18 +8,25 @@ Use the plugin to support inputs of Quantum Espresso pw.x executable.
 Supported codes
 ---------------
 
-==========  ==========================================
-QE version  support by aiida-quantumespresso
-==========  ==========================================
+==========  ================================================================
+QE version   Support by aiida-quantumespresso
+==========  ================================================================
 < 5.0       Not supported
 5.0 to 5.4  Legacy support [#legacy]_
-6.0 to 6.3  Supported (only old XML output) [#oldxml]_
-6.4         Supported
-==========  ==========================================
+6.0, 6.1    Supported (with old XML) [#oldxml1]_
+6.2, 6.3    Supported (with old XML; requires compilation flag) [#oldxml2]_
+6.4         Supported [#newxml]_
+==========  ================================================================
 
-.. [#legacy] These versions were originally compatible, but are not continuously tested any more; therefore their compatibility is not guaranteed. We will accept pull requests to maintain or improve compatibility with these versions.
+Notes:
 
-.. [#oldxml] A new XML output format has been introduced in version 6.0 of QE, and it became the default in version 6.2. To revert to the old format in versions 6.2 to 6.3, you must either run ``./configure`` with the option ``--disable-xml``, or add ``-D__OLDXML`` to ``MANUAL_FLAGS`` in ``make.inc`` before running ``make``.
+.. [#legacy] These versions were originally compatible, but are not continuously tested any more; therefore their compatibility is not guaranteed. We welcome pull requests that maintain or improve compatibility with these versions.
+
+.. [#oldxml1] QE 6.0 and 6.1 optionally provide a new output format (schema-based XML), disabled by default, which is not supported by aiida-quantumespresso.
+
+.. [#oldxml2] In QE 6.2 and 6.3, the new schema-based XML output format is enabled by default. This is still not supported by aiida-quantumespresso, so **you must disable it when compiling QE**: either run ``./configure`` with the option ``--disable-xml``, or add ``-D__OLDXML`` to ``MANUAL_FLAGS`` in ``make.inc``.
+
+.. [#newxml] Since version 6.4, the schema-based XML output is mandatory and fully supported by aiida-quantumespresso.
 
 
 Inputs
