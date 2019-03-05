@@ -75,7 +75,7 @@ def get_schema_filename(xml):
     schema_location = element_schema_location.split()[1]  # e.g. "http://www.quantum-espresso.org/ns/qes/qes-1.0.xsd"
     schema_filename = schema_location.rpartition('/')[2]  # e.g. "qes-1.0.xsd"
     
-    # TODO: hardcoding schema file while the version in the XML is wrong;
+    # TODO: Temporary! Hardcoding schema file while the version in the XML is wrong;
     #       bring it back to auto-detected when it's fixed!
     if schema_filename == 'qes-1.0.xsd':
         return 'qes_181201.xsd'
@@ -91,7 +91,9 @@ def is_valid_post_6_2_version(xml):
     """
     KNOWN_SCHEMA_VERSIONS = [
         'qes-1.0.xsd',
-        'qes_181201.xsd',  # TODO: temporary!
+        'qes_181201.xsd',  # TODO: temporary! (?)
+        'qes_190207.xsd',
+        'qes_190304.xsd',  # changes n_opt_steps from positiveInteger to integer
     ]
 
     schema_filename = get_schema_filename(xml)
