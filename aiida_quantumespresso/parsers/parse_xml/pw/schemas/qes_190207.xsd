@@ -786,7 +786,7 @@ Authors: Antonio Zambon, Paolo Giannozzi, Pietro Delugas
   <complexType name="opt_convType">
     <sequence>
         <element type="boolean" name="convergence_achieved"/>
-      <element type="positiveInteger" name="n_opt_steps"/>
+      <element type="integer" name="n_opt_steps"/>
       <element type="double" name="grad_norm"/>
     </sequence>
   </complexType>
