@@ -91,7 +91,8 @@ def generate_calc_job_node():
 
         :param entry_point_name: entry point name of the calculation class
         :param computer: a `Computer` instance
-        :param test_name: relative path of directory with test output files in the `fixtures/{entry_point_name}` folder
+        :param test_name: relative path of directory with test output files in the
+               `tests/parsers/fixtures/{entry_point_name}` folder
         :param inputs: any optional nodes to add as input links to the corrent CalcJobNode
         :param attributes: any optional attributes to set on the node
         :return: `CalcJobNode` instance with an attached `FolderData` as the `retrieved` node
